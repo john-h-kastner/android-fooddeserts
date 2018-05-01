@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">FoodDesert</string>
+    <string name="title_activity_maps">Map</string>
+    <string name="in_food_desert">Location is in a food desert</string>
+    <string name="not_in_food_desert">Location is not in a food desert</string>
+</resources>
