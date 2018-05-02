@@ -1,13 +1,16 @@
 package geog477.fooddesert;
 
 import android.graphics.Color;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 
 import com.esri.arcgisruntime.geometry.Geometry;
 import com.esri.arcgisruntime.geometry.GeometryEngine;
+import com.esri.arcgisruntime.geometry.Multipoint;
 import com.esri.arcgisruntime.geometry.Point;
+import com.esri.arcgisruntime.geometry.PointCollection;
 import com.esri.arcgisruntime.geometry.Polygon;
 import com.esri.arcgisruntime.geometry.SpatialReferences;
 import com.esri.arcgisruntime.mapping.ArcGISMap;
@@ -21,11 +24,13 @@ import com.esri.arcgisruntime.symbology.SimpleMarkerSymbol;
 import com.google.maps.GeoApiContext;
 import com.google.maps.NearbySearchRequest;
 import com.google.maps.PlacesApi;
+import com.google.maps.errors.ApiException;
 import com.google.maps.model.LatLng;
 import com.google.maps.model.PlaceType;
 import com.google.maps.model.PlacesSearchResponse;
 import com.google.maps.model.PlacesSearchResult;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,7 +40,8 @@ public class ArcMapActivity extends AppCompatActivity {
     private static final double METERS_IN_MILE = 1609.34;
 
     private MapView mMapView;
-    private List<Geometry> groceryStores;
+
+    private PointCollection groceryStores;
     private Polygon groceryStoresBuffer;
     private GraphicsOverlay groceryStoresBufferOverlay;
 
@@ -54,15 +60,16 @@ public class ArcMapActivity extends AppCompatActivity {
         groceryStoresBufferOverlay = new GraphicsOverlay();
         mMapView.getGraphicsOverlays().add(groceryStoresBufferOverlay);
 
-        /* Initial size of this array list is 60 so because that's the maximum number of elements
-         * returned by the Places API*/
-        groceryStores = new ArrayList<>(60);
+        groceryStores = new PointCollection(SpatialReferences.getWebMercator());
 
-        /* There should be some way to do this call async but I can't be bothered to find out.
-         * Simply starting it as a new Thread does not work. Another concern is that this function
-         * will be called every time onCreate is called. This includes when the screen is rotated
-         * among other things. */
-        fillStoresCollections(initialView, 5*(int)METERS_IN_MILE);
+        /*This should cause the API call to happen outside the UI thread*/
+        PlacesAsyncTask placesTask = new PlacesAsyncTask();
+        GeoApiContext context = new GeoApiContext
+                .Builder()
+                .apiKey(getString(R.string.google_maps_key))
+                .build();
+        PlacesAsyncTask.Params params = placesTask.buildParams(context, initialView, 5*(int)METERS_IN_MILE);
+        placesTask.execute(params);
     }
 
     @Override
@@ -83,69 +90,84 @@ public class ArcMapActivity extends AppCompatActivity {
         mMapView.dispose();
     }
 
-    private void fillStoresCollections(Point queryCenter, int radius) {
-        GeoApiContext context = new GeoApiContext.Builder().apiKey(getString(R.string.google_maps_key)).build();
-        NearbySearchRequest searchRequest = PlacesApi.nearbySearchQuery(context, pointToLatLng(queryCenter));
-        try {
-            PlacesSearchResponse response = searchRequest
-                    .radius(radius)
-                    .type(PlaceType.GROCERY_OR_SUPERMARKET)
-                    .await();
+    private class PlacesAsyncTask extends AsyncTask<PlacesAsyncTask.Params, Integer, PointCollection> {
 
-            fillStoresCollections(context, response);
-        } catch (Exception e){
-            Log.e(e.getClass().toString(), e.toString());
-        }
-    }
+        public class Params {
+            public final GeoApiContext context;
+            public final Point center;
+            public final int radiusMeters;
 
-    private void fillStoresCollections(GeoApiContext context, String nextPage){
-        NearbySearchRequest searchRequest = PlacesApi.nearbySearchNextPage(context, nextPage);
-        try {
-            /* Sleep for 2 seconds because a delay is required between calls to the API.
-             * Sleeping on the main thread is a bad idea but,
-             * it's required to make this paging request valid.
-             * Once this is moved off of the main thread the sleep will
-             * be OK.
-             */
-            Thread.sleep(2000);
-            PlacesSearchResponse response = searchRequest
-                    .pageToken(nextPage)
-                    .await();
-
-            fillStoresCollections(context, response);
-
-        } catch (Exception e){
-            Log.e(e.getClass().toString(), e.toString());
-        }
-    }
-
-    private void fillStoresCollections(GeoApiContext context, PlacesSearchResponse response){
-        for (PlacesSearchResult result : response.results) {
-            /*reproject the the point returned by the places API. This code seems to work but I'm
-             *not quite sure it's 100% correct.*/
-            LatLng store = result.geometry.location;
-            Geometry storeProj = GeometryEngine.project(latLngToPoint(store), SpatialReferences.getWebMercator());
-            groceryStores.add(storeProj);
+            private Params(GeoApiContext context, Point center, int radiusMeters) {
+                this.context = context;
+                this.center = center;
+                this.radiusMeters = radiusMeters;
+            }
         }
 
-        if(response.nextPageToken != null){
-            fillStoresCollections(context, response.nextPageToken);
-        } else {
+        public PlacesAsyncTask.Params buildParams(GeoApiContext context, Point center, int radiusMeters){
+            return new Params(context, center, radiusMeters);
+        }
+
+        @Override
+        protected PointCollection doInBackground(Params... params) {
+            PointCollection storeLocations = new PointCollection(SpatialReferences.getWebMercator());
+            for (Params p : params) {
+                NearbySearchRequest searchRequest = PlacesApi.nearbySearchQuery(p.context, pointToLatLng(p.center));
+
+                try {
+                    PlacesSearchResponse response = searchRequest
+                            .radius(p.radiusMeters)
+                            .type(PlaceType.GROCERY_OR_SUPERMARKET)
+                            .await();
+
+                    fillStoresSet(p.context, response, storeLocations);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            return storeLocations;
+        }
+
+        @Override
+        protected void onPostExecute(PointCollection storeLocations) {
+            //set up data structures for main class
+            groceryStores.addAll(storeLocations);
+            groceryStoresBuffer = GeometryEngine.buffer(new Multipoint(groceryStores), METERS_IN_MILE);
 
             //Symbols used to draw data
             SimpleMarkerSymbol redCircle = new SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, 0xFFFF0000, 10);
             FillSymbol blueFill = new SimpleFillSymbol(SimpleFillSymbol.Style.CROSS, Color.BLUE, null);
 
-            //Add a point for each store to the map
-            for(Geometry p : groceryStores){
-                Graphic g = new Graphic(p,redCircle);
+            for (Point p : storeLocations) {
+                Graphic g = new Graphic(p, redCircle);
                 groceryStoresBufferOverlay.getGraphics().add(g);
             }
 
-            //Draw a 1 mile buffer around all grocery stores
-            groceryStoresBuffer = GeometryEngine.buffer(GeometryEngine.union(groceryStores), METERS_IN_MILE);
             Graphic graphic1 = new Graphic(groceryStoresBuffer, blueFill);
             groceryStoresBufferOverlay.getGraphics().add(graphic1);
+        }
+
+        private void fillStoresSet(GeoApiContext context, PlacesSearchResponse response, PointCollection storeLocations) throws InterruptedException, IOException, ApiException {
+            for (PlacesSearchResult result : response.results) {
+            /*reproject the the point returned by the places API. This code seems to work but I'm
+             *not quite sure it's 100% correct.*/
+                LatLng store = result.geometry.location;
+
+                //casting could cause runtime error?
+                Point storeProj = (Point) GeometryEngine.project(latLngToPoint(store), SpatialReferences.getWebMercator());
+                storeLocations.add(storeProj);
+            }
+
+            if (response.nextPageToken != null) {
+                NearbySearchRequest searchRequest = PlacesApi.nearbySearchNextPage(context, response.nextPageToken);
+
+                Thread.sleep(2000);
+                PlacesSearchResponse pagingResponse = searchRequest
+                        .pageToken(response.nextPageToken)
+                        .await();
+
+                fillStoresSet(context, pagingResponse, storeLocations);
+            }
         }
     }
 
