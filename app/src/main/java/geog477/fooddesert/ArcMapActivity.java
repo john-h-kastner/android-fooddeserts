@@ -5,6 +5,8 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 
 import com.esri.arcgisruntime.geometry.Geometry;
 import com.esri.arcgisruntime.geometry.GeometryEngine;
@@ -15,6 +17,7 @@ import com.esri.arcgisruntime.geometry.Polygon;
 import com.esri.arcgisruntime.geometry.SpatialReferences;
 import com.esri.arcgisruntime.mapping.ArcGISMap;
 import com.esri.arcgisruntime.mapping.Basemap;
+import com.esri.arcgisruntime.mapping.Viewpoint;
 import com.esri.arcgisruntime.mapping.view.Graphic;
 import com.esri.arcgisruntime.mapping.view.GraphicsOverlay;
 import com.esri.arcgisruntime.mapping.view.MapView;
@@ -31,15 +34,24 @@ import com.google.maps.model.PlacesSearchResponse;
 import com.google.maps.model.PlacesSearchResult;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 public class ArcMapActivity extends AppCompatActivity {
 
     /* Constant value for number of meters in a mile*/
     private static final double METERS_IN_MILE = 1609.34;
 
+    /* Default query radius for places API */
+    /* TODO: make query radius dynamic */
+    private static final int PLACES_QUERY_RADIUS = 5 * (int) METERS_IN_MILE;
+
+    /*Symbols used to draw data*/
+    private static final SimpleMarkerSymbol RED_CIRCLE_SYMBOL = new SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 10);
+    private static final FillSymbol BLUE_FILL_SYMBOL = new SimpleFillSymbol(SimpleFillSymbol.Style.CROSS, Color.BLUE, null);
+
     private MapView mMapView;
+    private Button getStoresButton;
+
+    private GeoApiContext context;
 
     private PointCollection groceryStores;
     private Polygon groceryStoresBuffer;
@@ -54,22 +66,34 @@ public class ArcMapActivity extends AppCompatActivity {
          * location from gps and use that instead.*/
         Point initialView = new Point(-76.927, 38.996,  SpatialReferences.getWebMercator());
         mMapView = findViewById(R.id.mapView);
-        ArcGISMap map = new ArcGISMap(Basemap.Type.TOPOGRAPHIC, initialView.getY(), initialView.getX(), 16);
+        ArcGISMap map = new ArcGISMap(Basemap.Type.TOPOGRAPHIC, initialView.getY(), initialView.getX(), 11);
         mMapView.setMap(map);
+
+        getStoresButton = findViewById(R.id.getStoresButton);
+        getStoresButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                Geometry viewGeometry = mMapView.getCurrentViewpoint(Viewpoint.Type.CENTER_AND_SCALE).getTargetGeometry();
+                Point center = viewGeometry.getExtent().getCenter();
+                Point projCenter = (Point) GeometryEngine.project(center, SpatialReferences.getWgs84());
+
+                makePlacesCallAsync(projCenter, PLACES_QUERY_RADIUS);
+            }
+        });
 
         groceryStoresBufferOverlay = new GraphicsOverlay();
         mMapView.getGraphicsOverlays().add(groceryStoresBufferOverlay);
 
         groceryStores = new PointCollection(SpatialReferences.getWebMercator());
 
-        /*This should cause the API call to happen outside the UI thread*/
-        PlacesAsyncTask placesTask = new PlacesAsyncTask();
-        GeoApiContext context = new GeoApiContext
+        context = new GeoApiContext
                 .Builder()
                 .apiKey(getString(R.string.google_maps_key))
                 .build();
-        PlacesAsyncTask.Params params = placesTask.buildParams(context, initialView, 5*(int)METERS_IN_MILE);
-        placesTask.execute(params);
+
+        /* Make initial call to places API at initial location */
+        makePlacesCallAsync(initialView,  PLACES_QUERY_RADIUS);
     }
 
     @Override
@@ -90,29 +114,34 @@ public class ArcMapActivity extends AppCompatActivity {
         mMapView.dispose();
     }
 
+    private void makePlacesCallAsync(Point center, int radiusMeters){
+        /*This should cause the API call to happen outside the UI thread*/
+        PlacesAsyncTask placesTask = new PlacesAsyncTask();
+        PlacesAsyncTask.Params params = placesTask.buildParams(center, radiusMeters);
+        placesTask.execute(params);
+    }
+
     private class PlacesAsyncTask extends AsyncTask<PlacesAsyncTask.Params, Integer, PointCollection> {
 
         public class Params {
-            public final GeoApiContext context;
             public final Point center;
             public final int radiusMeters;
 
-            private Params(GeoApiContext context, Point center, int radiusMeters) {
-                this.context = context;
+            private Params(Point center, int radiusMeters) {
                 this.center = center;
                 this.radiusMeters = radiusMeters;
             }
         }
 
-        public PlacesAsyncTask.Params buildParams(GeoApiContext context, Point center, int radiusMeters){
-            return new Params(context, center, radiusMeters);
+        public PlacesAsyncTask.Params buildParams(Point center, int radiusMeters){
+            return new Params(center, radiusMeters);
         }
 
         @Override
         protected PointCollection doInBackground(Params... params) {
             PointCollection storeLocations = new PointCollection(SpatialReferences.getWebMercator());
             for (Params p : params) {
-                NearbySearchRequest searchRequest = PlacesApi.nearbySearchQuery(p.context, pointToLatLng(p.center));
+                NearbySearchRequest searchRequest = PlacesApi.nearbySearchQuery(context, pointToLatLng(p.center));
 
                 try {
                     PlacesSearchResponse response = searchRequest
@@ -120,7 +149,7 @@ public class ArcMapActivity extends AppCompatActivity {
                             .type(PlaceType.GROCERY_OR_SUPERMARKET)
                             .await();
 
-                    fillStoresSet(p.context, response, storeLocations);
+                    fillStoresSet(response, storeLocations);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -130,30 +159,32 @@ public class ArcMapActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(PointCollection storeLocations) {
-            //set up data structures for main class
-            groceryStores.addAll(storeLocations);
-            groceryStoresBuffer = GeometryEngine.buffer(new Multipoint(groceryStores), METERS_IN_MILE);
-
-            //Symbols used to draw data
-            SimpleMarkerSymbol redCircle = new SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, 0xFFFF0000, 10);
-            FillSymbol blueFill = new SimpleFillSymbol(SimpleFillSymbol.Style.CROSS, Color.BLUE, null);
-
-            for (Point p : storeLocations) {
-                Graphic g = new Graphic(p, redCircle);
-                groceryStoresBufferOverlay.getGraphics().add(g);
+            //Update data structures with new points
+            //maybe move this loop off of the main thread?
+            for(Point p : storeLocations){
+                if(!groceryStores.contains(p)){
+                    groceryStores.add(p);
+                }
             }
+            Multipoint groceryMultipoint = new Multipoint(groceryStores);
+            groceryStoresBuffer = GeometryEngine.buffer(groceryMultipoint, METERS_IN_MILE);
 
-            Graphic graphic1 = new Graphic(groceryStoresBuffer, blueFill);
+            //remove old graphics
+            groceryStoresBufferOverlay.getGraphics().clear();
+
+            //add new graphics
+            Graphic graphic0 = new Graphic(groceryMultipoint, RED_CIRCLE_SYMBOL);
+            groceryStoresBufferOverlay.getGraphics().add(graphic0);
+
+            Graphic graphic1 = new Graphic(groceryStoresBuffer, BLUE_FILL_SYMBOL);
             groceryStoresBufferOverlay.getGraphics().add(graphic1);
         }
 
-        private void fillStoresSet(GeoApiContext context, PlacesSearchResponse response, PointCollection storeLocations) throws InterruptedException, IOException, ApiException {
+        private void fillStoresSet(PlacesSearchResponse response, PointCollection storeLocations) throws InterruptedException, IOException, ApiException {
             for (PlacesSearchResult result : response.results) {
-            /*reproject the the point returned by the places API. This code seems to work but I'm
-             *not quite sure it's 100% correct.*/
+                /*reproject the the point returned by the places API. This code seems to work but I'm
+                 *not quite sure it's 100% correct.*/
                 LatLng store = result.geometry.location;
-
-                //casting could cause runtime error?
                 Point storeProj = (Point) GeometryEngine.project(latLngToPoint(store), SpatialReferences.getWebMercator());
                 storeLocations.add(storeProj);
             }
@@ -161,12 +192,15 @@ public class ArcMapActivity extends AppCompatActivity {
             if (response.nextPageToken != null) {
                 NearbySearchRequest searchRequest = PlacesApi.nearbySearchNextPage(context, response.nextPageToken);
 
+                /* A 2 second interval is required between calls to the places API.
+                 * This should only ever be called off of the UI thread so, sleeping shouldn't
+                 * cause frame rate issues */
                 Thread.sleep(2000);
                 PlacesSearchResponse pagingResponse = searchRequest
                         .pageToken(response.nextPageToken)
                         .await();
 
-                fillStoresSet(context, pagingResponse, storeLocations);
+                fillStoresSet(pagingResponse, storeLocations);
             }
         }
     }

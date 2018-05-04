@@ -8,7 +8,6 @@
  * Implement user interface:
    * Search box to jump to location
    * Touch to ask if a location is in a food desert
-   * Some way to run a Google Places API Query on current map location
    * Anything else that looks good
  * Add anything else we need to this list. 
  
