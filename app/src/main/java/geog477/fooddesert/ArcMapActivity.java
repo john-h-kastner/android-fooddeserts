@@ -1,5 +1,6 @@
 package geog477.fooddesert;
 
+import android.content.Context;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -33,7 +34,12 @@ import com.google.maps.model.PlaceType;
 import com.google.maps.model.PlacesSearchResponse;
 import com.google.maps.model.PlacesSearchResult;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 public class ArcMapActivity extends AppCompatActivity {
 
@@ -47,6 +53,8 @@ public class ArcMapActivity extends AppCompatActivity {
     /*Symbols used to draw data*/
     private static final SimpleMarkerSymbol RED_CIRCLE_SYMBOL = new SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 10);
     private static final FillSymbol BLUE_FILL_SYMBOL = new SimpleFillSymbol(SimpleFillSymbol.Style.CROSS, Color.BLUE, null);
+
+    private static final String POINT_STORE_FILE = "pointStorage";
 
     private MapView mMapView;
     private Button getStoresButton;
@@ -92,13 +100,15 @@ public class ArcMapActivity extends AppCompatActivity {
                 .apiKey(getString(R.string.google_maps_key))
                 .build();
 
-        /* Make initial call to places API at initial location */
-        makePlacesCallAsync(initialView,  PLACES_QUERY_RADIUS);
+        /*load and render saved points*/
+        loadPointCollection();
+        updatePointsGraphics();
     }
 
     @Override
     protected void onPause(){
         mMapView.pause();
+        savePointCollection();
         super.onPause();
     }
 
@@ -119,6 +129,86 @@ public class ArcMapActivity extends AppCompatActivity {
         PlacesAsyncTask placesTask = new PlacesAsyncTask();
         PlacesAsyncTask.Params params = placesTask.buildParams(center, radiusMeters);
         placesTask.execute(params);
+    }
+
+    /* Update the graphics displayed on the mapView to reflect points added since
+     * the las call to updatePointsGraphics.*/
+    private void updatePointsGraphics(){
+        Multipoint groceryMultipoint = new Multipoint(groceryStores);
+        groceryStoresBuffer = GeometryEngine.buffer(groceryMultipoint, METERS_IN_MILE);
+
+        //remove old graphics
+        groceryStoresBufferOverlay.getGraphics().clear();
+
+        //add new graphics
+        Graphic graphic0 = new Graphic(groceryMultipoint, RED_CIRCLE_SYMBOL);
+        groceryStoresBufferOverlay.getGraphics().add(graphic0);
+
+        Graphic graphic1 = new Graphic(groceryStoresBuffer, BLUE_FILL_SYMBOL);
+        groceryStoresBufferOverlay.getGraphics().add(graphic1);
+    }
+
+    /* Save the current collection of points to a private file.
+     * This method is called in onPause to record any points obtained from places API.
+     * I don't think it's worth using a database at the moment but, if we want to store more data
+     * (name of store, type of store, etc.), it might be good to use one.*/
+    private void savePointCollection(){
+        ObjectOutputStream objOut = null;
+        try {
+            FileOutputStream file = openFileOutput(POINT_STORE_FILE, Context.MODE_PRIVATE);
+            objOut = new ObjectOutputStream(file);
+
+            //file starts with the number of points that will be in the file
+            objOut.writeInt(groceryStores.size());
+
+            //followed by the coordinates of each point
+            for (Point p : groceryStores) {
+                objOut.writeDouble(p.getX());
+                objOut.writeDouble(p.getY());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if(objOut != null) {
+                try {
+                    objOut.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    /* Load points into the point collection from a private file.
+     * This method is called in onCreate to retrieve points obtained from
+     * Places API in prior runs. */
+    private void loadPointCollection() {
+        ObjectInput objIn = null;
+        try {
+            FileInputStream file = openFileInput(POINT_STORE_FILE);
+            objIn = new ObjectInputStream(file);
+
+            /* number of points in the file is in the first bytes in the file */
+            int numPoints = objIn.readInt();
+
+            for(int i = 0; i < numPoints; i++){
+                double x = objIn.readDouble();
+                double y = objIn.readDouble();
+                Point p = new Point(x,y,SpatialReferences.getWebMercator());
+                groceryStores.add(p);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (objIn != null) {
+                try {
+                    objIn.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     private class PlacesAsyncTask extends AsyncTask<PlacesAsyncTask.Params, Integer, PointCollection> {
@@ -166,18 +256,8 @@ public class ArcMapActivity extends AppCompatActivity {
                     groceryStores.add(p);
                 }
             }
-            Multipoint groceryMultipoint = new Multipoint(groceryStores);
-            groceryStoresBuffer = GeometryEngine.buffer(groceryMultipoint, METERS_IN_MILE);
 
-            //remove old graphics
-            groceryStoresBufferOverlay.getGraphics().clear();
-
-            //add new graphics
-            Graphic graphic0 = new Graphic(groceryMultipoint, RED_CIRCLE_SYMBOL);
-            groceryStoresBufferOverlay.getGraphics().add(graphic0);
-
-            Graphic graphic1 = new Graphic(groceryStoresBuffer, BLUE_FILL_SYMBOL);
-            groceryStoresBufferOverlay.getGraphics().add(graphic1);
+            updatePointsGraphics();
         }
 
         private void fillStoresSet(PlacesSearchResponse response, PointCollection storeLocations) throws InterruptedException, IOException, ApiException {

@@ -2,7 +2,6 @@
 
 ## Current Tasks 
 
- * Store points retreived from the Places API between runs
  * Set initial view point to the users location (if gps is available)
  * Automaticaly query places API for many locations around user location
  * Implement user interface:
