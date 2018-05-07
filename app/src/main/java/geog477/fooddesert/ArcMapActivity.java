@@ -1,11 +1,9 @@
 package geog477.fooddesert;
 
-import android.content.Context;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
@@ -23,7 +21,9 @@ import com.esri.arcgisruntime.mapping.view.Graphic;
 import com.esri.arcgisruntime.mapping.view.GraphicsOverlay;
 import com.esri.arcgisruntime.mapping.view.MapView;
 import com.esri.arcgisruntime.symbology.FillSymbol;
+import com.esri.arcgisruntime.symbology.LineSymbol;
 import com.esri.arcgisruntime.symbology.SimpleFillSymbol;
+import com.esri.arcgisruntime.symbology.SimpleLineSymbol;
 import com.esri.arcgisruntime.symbology.SimpleMarkerSymbol;
 import com.google.maps.GeoApiContext;
 import com.google.maps.NearbySearchRequest;
@@ -34,12 +34,7 @@ import com.google.maps.model.PlaceType;
 import com.google.maps.model.PlacesSearchResponse;
 import com.google.maps.model.PlacesSearchResult;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 
 public class ArcMapActivity extends AppCompatActivity {
 
@@ -53,17 +48,20 @@ public class ArcMapActivity extends AppCompatActivity {
     /*Symbols used to draw data*/
     private static final SimpleMarkerSymbol RED_CIRCLE_SYMBOL = new SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 10);
     private static final FillSymbol BLUE_FILL_SYMBOL = new SimpleFillSymbol(SimpleFillSymbol.Style.CROSS, Color.BLUE, null);
+    private static final LineSymbol BLACK_LINE_SYMBOL = new SimpleLineSymbol(SimpleLineSymbol.Style.DASH, Color.BLACK, 3);
 
-    private static final String POINT_STORE_FILE = "pointStorage";
+    /*Files where data from the Places API will be stored between runs*/
+    private static final String GROCERY_STORE_POINTS_FILE = "grocery_store_points";
+    private static final String QUERY_CENTER_POINTS_FILE = "query_center_points";
 
     private MapView mMapView;
     private Button getStoresButton;
 
     private GeoApiContext context;
 
-    private PointCollection groceryStores;
-    private Polygon groceryStoresBuffer;
     private GraphicsOverlay groceryStoresBufferOverlay;
+    private PointCollection groceryStores, queryCenters;
+    private Polygon groceryStoresBuffer, queryBuffer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,12 +79,9 @@ public class ArcMapActivity extends AppCompatActivity {
         getStoresButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
                 Geometry viewGeometry = mMapView.getCurrentViewpoint(Viewpoint.Type.CENTER_AND_SCALE).getTargetGeometry();
                 Point center = viewGeometry.getExtent().getCenter();
-                Point projCenter = (Point) GeometryEngine.project(center, SpatialReferences.getWgs84());
-
-                makePlacesCallAsync(projCenter, PLACES_QUERY_RADIUS);
+                makePlacesCallAsync(center, PLACES_QUERY_RADIUS);
             }
         });
 
@@ -94,6 +89,7 @@ public class ArcMapActivity extends AppCompatActivity {
         mMapView.getGraphicsOverlays().add(groceryStoresBufferOverlay);
 
         groceryStores = new PointCollection(SpatialReferences.getWebMercator());
+        queryCenters = new PointCollection(SpatialReferences.getWebMercator());
 
         context = new GeoApiContext
                 .Builder()
@@ -101,14 +97,16 @@ public class ArcMapActivity extends AppCompatActivity {
                 .build();
 
         /*load and render saved points*/
-        loadPointCollection();
+        PointFileUtil.loadPointCollection(this, GROCERY_STORE_POINTS_FILE, groceryStores);
+        PointFileUtil.loadPointCollection(this, QUERY_CENTER_POINTS_FILE, queryCenters);
         updatePointsGraphics();
     }
 
     @Override
     protected void onPause(){
         mMapView.pause();
-        savePointCollection();
+        PointFileUtil.savePointCollection(this, GROCERY_STORE_POINTS_FILE, groceryStores);
+        PointFileUtil.savePointCollection(this, QUERY_CENTER_POINTS_FILE, queryCenters);
         super.onPause();
     }
 
@@ -125,6 +123,10 @@ public class ArcMapActivity extends AppCompatActivity {
     }
 
     private void makePlacesCallAsync(Point center, int radiusMeters){
+        /* save query center to point collection.
+         * This change will be rendered in using updatePointsGraphics in onPostExecute*/
+        queryCenters.add(center);
+
         /*This should cause the API call to happen outside the UI thread*/
         PlacesAsyncTask placesTask = new PlacesAsyncTask();
         PlacesAsyncTask.Params params = placesTask.buildParams(center, radiusMeters);
@@ -134,8 +136,13 @@ public class ArcMapActivity extends AppCompatActivity {
     /* Update the graphics displayed on the mapView to reflect points added since
      * the las call to updatePointsGraphics.*/
     private void updatePointsGraphics(){
+        //prepare buffer for grocery stores
         Multipoint groceryMultipoint = new Multipoint(groceryStores);
         groceryStoresBuffer = GeometryEngine.buffer(groceryMultipoint, METERS_IN_MILE);
+
+        //prepare buffer for query area
+        Multipoint queryMultipoint = new Multipoint(queryCenters);
+        queryBuffer = GeometryEngine.buffer(queryMultipoint, PLACES_QUERY_RADIUS);
 
         //remove old graphics
         groceryStoresBufferOverlay.getGraphics().clear();
@@ -146,69 +153,9 @@ public class ArcMapActivity extends AppCompatActivity {
 
         Graphic graphic1 = new Graphic(groceryStoresBuffer, BLUE_FILL_SYMBOL);
         groceryStoresBufferOverlay.getGraphics().add(graphic1);
-    }
 
-    /* Save the current collection of points to a private file.
-     * This method is called in onPause to record any points obtained from places API.
-     * I don't think it's worth using a database at the moment but, if we want to store more data
-     * (name of store, type of store, etc.), it might be good to use one.*/
-    private void savePointCollection(){
-        ObjectOutputStream objOut = null;
-        try {
-            FileOutputStream file = openFileOutput(POINT_STORE_FILE, Context.MODE_PRIVATE);
-            objOut = new ObjectOutputStream(file);
-
-            //file starts with the number of points that will be in the file
-            objOut.writeInt(groceryStores.size());
-
-            //followed by the coordinates of each point
-            for (Point p : groceryStores) {
-                objOut.writeDouble(p.getX());
-                objOut.writeDouble(p.getY());
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if(objOut != null) {
-                try {
-                    objOut.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-    /* Load points into the point collection from a private file.
-     * This method is called in onCreate to retrieve points obtained from
-     * Places API in prior runs. */
-    private void loadPointCollection() {
-        ObjectInput objIn = null;
-        try {
-            FileInputStream file = openFileInput(POINT_STORE_FILE);
-            objIn = new ObjectInputStream(file);
-
-            /* number of points in the file is in the first bytes in the file */
-            int numPoints = objIn.readInt();
-
-            for(int i = 0; i < numPoints; i++){
-                double x = objIn.readDouble();
-                double y = objIn.readDouble();
-                Point p = new Point(x,y,SpatialReferences.getWebMercator());
-                groceryStores.add(p);
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (objIn != null) {
-                try {
-                    objIn.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
+        Graphic graphic2 = new Graphic(queryBuffer, BLACK_LINE_SYMBOL);
+        groceryStoresBufferOverlay.getGraphics().add(graphic2);
     }
 
     private class PlacesAsyncTask extends AsyncTask<PlacesAsyncTask.Params, Integer, PointCollection> {
@@ -231,8 +178,9 @@ public class ArcMapActivity extends AppCompatActivity {
         protected PointCollection doInBackground(Params... params) {
             PointCollection storeLocations = new PointCollection(SpatialReferences.getWebMercator());
             for (Params p : params) {
-                NearbySearchRequest searchRequest = PlacesApi.nearbySearchQuery(context, pointToLatLng(p.center));
 
+                LatLng projQueryCenter = pointToLatLng((Point) GeometryEngine.project(p.center, SpatialReferences.getWgs84()));
+                NearbySearchRequest searchRequest = PlacesApi.nearbySearchQuery(context, projQueryCenter);
                 try {
                     PlacesSearchResponse response = searchRequest
                             .radius(p.radiusMeters)
