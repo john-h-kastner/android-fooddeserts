@@ -1,6 +1,8 @@
 package geog477.fooddesert;
 
 import android.content.Context;
+import android.os.AsyncTask;
+import android.util.Log;
 
 import com.esri.arcgisruntime.geometry.Point;
 import com.esri.arcgisruntime.geometry.PointCollection;
@@ -25,7 +27,7 @@ public class PointFileUtil {
      * This method should be called in onPause to record any points obtained from places API.
      * I don't think it's worth using a database at the moment but, if we want to store more data
      * (name of store, type of store, etc.), it might be good to use one.*/
-    public static void savePointCollection(Context c, String fileName, PointCollection points){
+    public static void savePointCollection(Context c, String fileName, PointCollection points) {
         ObjectOutputStream objOut = null;
         try {
             FileOutputStream file = c.openFileOutput(fileName, Context.MODE_PRIVATE);
@@ -42,7 +44,7 @@ public class PointFileUtil {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            if(objOut != null) {
+            if (objOut != null) {
                 try {
                     objOut.close();
                 } catch (Exception e) {
@@ -55,7 +57,7 @@ public class PointFileUtil {
     /* Load points into the point collection from a private file.
      * This method should be called in onCreate to retrieve points obtained from
      * Places API in prior runs. */
-    public static void loadPointCollection(Context c, String fileName, PointCollection points) {
+    public static void loadPointCollection(Context c, String fileName,  PointCollection points) {
         ObjectInput objIn = null;
         try {
             FileInputStream file = c.openFileInput(fileName);
@@ -64,10 +66,10 @@ public class PointFileUtil {
             /* number of points in the file is in the first bytes in the file */
             int numPoints = objIn.readInt();
 
-            for(int i = 0; i < numPoints; i++){
+            for (int i = 0; i < numPoints; i++) {
                 double x = objIn.readDouble();
                 double y = objIn.readDouble();
-                Point p = new Point(x,y, SpatialReferences.getWebMercator());
+                Point p = new Point(x, y, SpatialReferences.getWebMercator());
                 points.add(p);
             }
 
@@ -81,6 +83,40 @@ public class PointFileUtil {
                     e.printStackTrace();
                 }
             }
+        }
+    }
+
+    public static class LoadPointsAsyncTask extends AsyncTask<String, Integer, PointCollection> {
+        private final PointCollection finalPoints;
+        private final Context context;
+        private final Runnable postExecTask;
+
+        public LoadPointsAsyncTask(Context context, PointCollection finalPoints, Runnable postExecTask){
+            this.finalPoints = finalPoints;
+            this.context = context;
+            this.postExecTask = postExecTask;
+        }
+
+        @Override
+        protected PointCollection doInBackground(String... params) {
+            PointCollection points = new PointCollection(SpatialReferences.getWebMercator());
+            for(String str : params){
+                PointFileUtil.loadPointCollection(context, str, points);
+            }
+            return points;
+        }
+
+        @Override
+        protected void onPostExecute(PointCollection storeLocations) {
+            //Update data structures with new points
+            //maybe move this loop off of the main thread?
+            for(Point p : storeLocations){
+                if(!finalPoints.contains(p)){
+                    finalPoints.add(p);
+                }
+            }
+
+            postExecTask.run();
         }
     }
 }

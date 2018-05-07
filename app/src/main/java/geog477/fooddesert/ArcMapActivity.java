@@ -1,9 +1,11 @@
 package geog477.fooddesert;
 
+import android.content.Context;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
@@ -34,6 +36,7 @@ import com.google.maps.model.PlaceType;
 import com.google.maps.model.PlacesSearchResponse;
 import com.google.maps.model.PlacesSearchResult;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 
 public class ArcMapActivity extends AppCompatActivity {
@@ -96,10 +99,15 @@ public class ArcMapActivity extends AppCompatActivity {
                 .apiKey(getString(R.string.google_maps_key))
                 .build();
 
-        /*load and render saved points*/
-        PointFileUtil.loadPointCollection(this, GROCERY_STORE_POINTS_FILE, groceryStores);
-        PointFileUtil.loadPointCollection(this, QUERY_CENTER_POINTS_FILE, queryCenters);
-        updatePointsGraphics();
+        /*load saved data async*/
+        Runnable updateGraphics = new Runnable() {
+            @Override
+            public void run() {
+                updatePointsGraphics();
+            }
+        };
+        new PointFileUtil.LoadPointsAsyncTask(this, groceryStores, updateGraphics).execute(GROCERY_STORE_POINTS_FILE);
+        new PointFileUtil.LoadPointsAsyncTask(this, queryCenters, updateGraphics).execute(QUERY_CENTER_POINTS_FILE);
     }
 
     @Override
@@ -160,7 +168,7 @@ public class ArcMapActivity extends AppCompatActivity {
 
     private class PlacesAsyncTask extends AsyncTask<PlacesAsyncTask.Params, Integer, PointCollection> {
 
-        public class Params {
+        protected class Params {
             public final Point center;
             public final int radiusMeters;
 
