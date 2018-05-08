@@ -1,11 +1,14 @@
 package geog477.fooddesert;
 
+import android.app.DialogFragment;
+import android.app.Fragment;
 import android.content.Context;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 
@@ -19,6 +22,7 @@ import com.esri.arcgisruntime.geometry.SpatialReferences;
 import com.esri.arcgisruntime.mapping.ArcGISMap;
 import com.esri.arcgisruntime.mapping.Basemap;
 import com.esri.arcgisruntime.mapping.Viewpoint;
+import com.esri.arcgisruntime.mapping.view.DefaultMapViewOnTouchListener;
 import com.esri.arcgisruntime.mapping.view.Graphic;
 import com.esri.arcgisruntime.mapping.view.GraphicsOverlay;
 import com.esri.arcgisruntime.mapping.view.MapView;
@@ -77,6 +81,28 @@ public class ArcMapActivity extends AppCompatActivity {
         mMapView = findViewById(R.id.mapView);
         ArcGISMap map = new ArcGISMap(Basemap.Type.TOPOGRAPHIC, initialView.getY(), initialView.getX(), 11);
         mMapView.setMap(map);
+
+        mMapView.setOnTouchListener(new DefaultMapViewOnTouchListener(this, mMapView) {
+            @Override
+            public void onLongPress(MotionEvent e){
+                Point mapPoint = mMapView.screenToLocation(new android.graphics.Point((int)e.getX(), (int)e.getY()));
+
+                boolean hasData = queryBuffer != null && GeometryEngine.contains(queryBuffer, mapPoint);
+                boolean inFoodDesert = hasData && groceryStoresBuffer != null && !GeometryEngine.contains(groceryStoresBuffer, mapPoint);
+
+                FoodDesertStatusDialogFragment.FoodDesertStatus status;
+                if(!hasData){
+                    status = FoodDesertStatusDialogFragment.FoodDesertStatus.NO_DATA;
+                } else if (inFoodDesert){
+                    status = FoodDesertStatusDialogFragment.FoodDesertStatus.IN_FOOD_DESERT;
+                } else {
+                    status = FoodDesertStatusDialogFragment.FoodDesertStatus.NOT_IN_FOOD_DESERT;
+                }
+
+                FoodDesertStatusDialogFragment.newInstance(status).show(getSupportFragmentManager(), "foodDesertStatus");
+
+            }
+        });
 
         getStoresButton = findViewById(R.id.getStoresButton);
         getStoresButton.setOnClickListener(new View.OnClickListener() {

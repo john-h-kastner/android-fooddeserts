@@ -13,20 +13,36 @@ import android.support.v7.app.AlertDialog;
 
 public class FoodDesertStatusDialogFragment extends DialogFragment {
 
+    private static final String FOOD_DESERT_STATUS = "foodDesertStatus";
+
+    public enum FoodDesertStatus {
+
+        IN_FOOD_DESERT (R.string.in_food_desert),
+        NOT_IN_FOOD_DESERT (R.string.not_in_food_desert),
+        NO_DATA (R.string.no_data);
+
+        protected final int statusStringResource;
+        FoodDesertStatus(int statusStringResource){
+            this.statusStringResource = statusStringResource;
+        }
+    }
+
+    public static FoodDesertStatusDialogFragment newInstance(FoodDesertStatus status){
+        Bundle args = new Bundle();
+        args.putInt(FOOD_DESERT_STATUS, status.statusStringResource);
+
+        FoodDesertStatusDialogFragment fragment = new FoodDesertStatusDialogFragment();
+        fragment.setArguments(args);
+        return fragment;
+    }
+
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState){
-
         Bundle args = getArguments();
-
-        boolean inFoodDesert = args.getBoolean("inFoodDesert");
+        int statusStringResource = args.getInt(FOOD_DESERT_STATUS);
 
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-
-        if (inFoodDesert){
-            builder.setMessage(R.string.in_food_desert);
-        } else {
-            builder.setMessage(R.string.not_in_food_desert);
-        }
+        builder.setMessage(statusStringResource);
 
         return builder.create();
     }
