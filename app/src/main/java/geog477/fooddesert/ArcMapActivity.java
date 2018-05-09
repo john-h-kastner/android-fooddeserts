@@ -84,23 +84,10 @@ public class ArcMapActivity extends AppCompatActivity {
 
         mMapView.setOnTouchListener(new DefaultMapViewOnTouchListener(this, mMapView) {
             @Override
-            public void onLongPress(MotionEvent e){
+            public boolean onSingleTapConfirmed(MotionEvent e){
                 Point mapPoint = mMapView.screenToLocation(new android.graphics.Point((int)e.getX(), (int)e.getY()));
-
-                boolean hasData = queryBuffer != null && GeometryEngine.contains(queryBuffer, mapPoint);
-                boolean inFoodDesert = hasData && groceryStoresBuffer != null && !GeometryEngine.contains(groceryStoresBuffer, mapPoint);
-
-                FoodDesertStatusDialogFragment.FoodDesertStatus status;
-                if(!hasData){
-                    status = FoodDesertStatusDialogFragment.FoodDesertStatus.NO_DATA;
-                } else if (inFoodDesert){
-                    status = FoodDesertStatusDialogFragment.FoodDesertStatus.IN_FOOD_DESERT;
-                } else {
-                    status = FoodDesertStatusDialogFragment.FoodDesertStatus.NOT_IN_FOOD_DESERT;
-                }
-
-                FoodDesertStatusDialogFragment.newInstance(status).show(getSupportFragmentManager(), "foodDesertStatus");
-
+                displayStatusDialog(mapPoint);
+                return true;
             }
         });
 
@@ -156,15 +143,61 @@ public class ArcMapActivity extends AppCompatActivity {
         mMapView.dispose();
     }
 
-    private void makePlacesCallAsync(Point center, int radiusMeters){
+    /* Creates and displays a dialog box describing the food desert status of a point.
+     * This status is determined using the buffers collected from API calls and files saved to the
+     * device. If there is not data for the query point, this method attempts to collect additional
+     * data from the places API. */
+    private void displayStatusDialog(final Point query){
+        FoodDesertStatus status = getPointStatus(query);
+
+        /* Define call back for possible async task.
+         * This callback will display a dialog with the status of the clicked point*/
+        Runnable callback = new Runnable() {
+            @Override
+            public void run() {
+                FoodDesertStatus newStatus = getPointStatus(query);
+                FoodDesertStatusDialogFragment.newInstance(newStatus).show(getSupportFragmentManager(), "foodDesertStatus");
+            }
+        };
+
+        if(status == FoodDesertStatus.NO_DATA){
+            /* no data has been aquired for the point so, we atempt to query the api.
+             * The callback is invoked after the query resolves.*/
+            makePlacesCallAsync(query, PLACES_QUERY_RADIUS, callback);
+        } else {
+            /* If the status is already known, no API is needed so, we invoke the callback
+               immediately */
+            callback.run();
+        }
+    }
+
+    /* Uses the buffers to decide if a given point is in a food desert.
+     * If no data has been collected for the point, no attempt is made to collect aditional data.*/
+    private FoodDesertStatus getPointStatus(Point query){
+        if(queryBuffer == null || queryBuffer.isEmpty() || groceryStoresBuffer == null || !GeometryEngine.contains(queryBuffer, query)){
+            return FoodDesertStatus.NO_DATA;
+        } else if (GeometryEngine.contains(groceryStoresBuffer, query)) {
+            return FoodDesertStatus.NOT_IN_FOOD_DESERT;
+        } else {
+            return FoodDesertStatus.IN_FOOD_DESERT;
+        }
+    }
+
+    private PlacesAsyncTask makePlacesCallAsync(Point center, int radiusMeters, Runnable callback){
         /* save query center to point collection.
          * This change will be rendered in using updatePointsGraphics in onPostExecute*/
         queryCenters.add(center);
 
         /*This should cause the API call to happen outside the UI thread*/
-        PlacesAsyncTask placesTask = new PlacesAsyncTask();
+        PlacesAsyncTask placesTask = new PlacesAsyncTask(callback);
         PlacesAsyncTask.Params params = placesTask.buildParams(center, radiusMeters);
         placesTask.execute(params);
+
+        return placesTask;
+    }
+
+    private PlacesAsyncTask makePlacesCallAsync(Point center, int radiusMeters){
+        return makePlacesCallAsync(center, radiusMeters, null);
     }
 
     /* Update the graphics displayed on the mapView to reflect points added since
@@ -194,6 +227,7 @@ public class ArcMapActivity extends AppCompatActivity {
 
     private class PlacesAsyncTask extends AsyncTask<PlacesAsyncTask.Params, Integer, PointCollection> {
 
+        /*Class contains the params that need to be passed to doInBackground*/
         protected class Params {
             public final Point center;
             public final int radiusMeters;
@@ -206,6 +240,18 @@ public class ArcMapActivity extends AppCompatActivity {
 
         public PlacesAsyncTask.Params buildParams(Point center, int radiusMeters){
             return new Params(center, radiusMeters);
+        }
+
+        private final Runnable callback;
+
+        /*A call back can be provided to the constructor to run code once the async task has
+          resolved. callback is invoked after onPostExecute */
+        public  PlacesAsyncTask (Runnable callback) {
+            this.callback = callback;
+        }
+
+        public PlacesAsyncTask(){
+            this.callback = null;
         }
 
         @Override
@@ -240,6 +286,10 @@ public class ArcMapActivity extends AppCompatActivity {
             }
 
             updatePointsGraphics();
+
+            if(callback != null){
+                callback.run();
+            }
         }
 
         private void fillStoresSet(PlacesSearchResponse response, PointCollection storeLocations) throws InterruptedException, IOException, ApiException {
