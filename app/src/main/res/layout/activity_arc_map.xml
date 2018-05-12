@@ -35,6 +35,7 @@
             android:layout_below="@id/buttonMapType"
             android:text="@string/loadStores"/>
     </RelativeLayout>
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_below="@id/toolbar"
@@ -107,6 +108,29 @@
 
         </RelativeLayout>
     </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/loading_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.4"
+        android:animateLayoutChanges="true"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            style="@style/Base.TextAppearance.AppCompat.Large"
+            android:text="loading....."/>
+
+        <!--<ProgressBar
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:indeterminate="true"
+            android:layout_alignParentBottom="true" />-->
+    </FrameLayout>
+
     <RelativeLayout
         android:id="@+id/navbar"
         android:layout_width="fill_parent"

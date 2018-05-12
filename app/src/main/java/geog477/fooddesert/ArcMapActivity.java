@@ -2,6 +2,10 @@ package geog477.fooddesert;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.app.DialogFragment;
+import android.app.Fragment;
+import android.app.ProgressDialog;
+import android.content.Context;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -12,7 +16,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
-
+import android.widget.ProgressBar;
 import com.esri.arcgisruntime.geometry.Geometry;
 import com.esri.arcgisruntime.geometry.GeometryEngine;
 import com.esri.arcgisruntime.geometry.Multipoint;
@@ -61,6 +65,9 @@ public class ArcMapActivity extends AppCompatActivity {
     /*Files where data from the Places API will be stored between runs*/
     private static final String GROCERY_STORE_POINTS_FILE = "grocery_store_points";
     private static final String QUERY_CENTER_POINTS_FILE = "query_center_points";
+
+    //private View progressOverlay;
+    private View progress;
 
     private GeoApiContext context;
     private GraphicsOverlay groceryStoresBufferOverlay;
@@ -140,6 +147,8 @@ public class ArcMapActivity extends AppCompatActivity {
                 makePlacesCallAsync(center, PLACES_QUERY_RADIUS);
             }
         });
+
+        progress = findViewById(R.id.loading_overlay);
 
         groceryStoresBufferOverlay = new GraphicsOverlay();
         mMapView.getGraphicsOverlays().add(groceryStoresBufferOverlay);
@@ -231,12 +240,15 @@ public class ArcMapActivity extends AppCompatActivity {
     private void displayStatusDialog(final Point query){
         FoodDesertStatus status = getPointStatus(query);
 
+        progress.setVisibility(View.VISIBLE);
+
         /* Define call back for possible async task.
          * This callback will display a dialog with the status of the clicked point*/
         Runnable callback = new Runnable() {
             @Override
             public void run() {
                 FoodDesertStatus newStatus = getPointStatus(query);
+                progress.setVisibility(View.GONE);
                 FoodDesertStatusDialogFragment.newInstance(newStatus).show(getSupportFragmentManager(), "foodDesertStatus");
             }
         };
