@@ -3,4 +3,8 @@
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#FF4081</color>
+    <color name="legend_border_color">#cc000000</color>
+    <color name="food_desert_buffer_fill_color">#aa0000ff</color>
+    <color name="data_area_buffer_border_color">#ff000000</color>
+    <color name="point_marker_circle_color">#ffff0000</color>
 </resources>

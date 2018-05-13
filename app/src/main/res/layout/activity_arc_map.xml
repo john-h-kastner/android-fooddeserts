@@ -18,4 +18,77 @@
         android:layout_alignParentBottom="true"
         android:text="@string/loadStores"/>
 
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="left|top"
+            android:background="@drawable/legend_border">
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/legend_border_width"
+                android:layout_marginLeft="@dimen/legend_border_width"
+                android:layout_alignParentLeft="true"
+                android:layout_alignTop="@+id/buffer_fill_text"
+                android:id="@+id/buffer_fill_image_view"
+                android:src="@drawable/food_dessert_buffer_fill"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="@dimen/legend_border_width"
+                android:layout_toRightOf="@id/buffer_fill_image_view"
+                android:layout_alignParentTop="true"
+                android:id="@id/buffer_fill_text"
+                android:text="Area Not in Food Desert" />
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="@dimen/legend_border_width"
+                android:layout_alignParentLeft="true"
+                android:layout_below="@id/buffer_fill_image_view"
+                android:id="@+id/buffer_outline_image_view"
+                android:layout_alignTop="@+id/buffer_outline_text"
+                android:src="@drawable/data_area_buffer_border"/>
+
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="@dimen/legend_border_width"
+                android:layout_toRightOf="@id/buffer_outline_image_view"
+                android:layout_below="@id/buffer_fill_text"
+                android:id="@id/buffer_outline_text"
+                android:text="Area with Data Collected" />
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="@dimen/legend_border_width"
+                android:layout_alignParentLeft="true"
+                android:layout_below="@id/buffer_outline_image_view"
+                android:id="@+id/point_marker_image_view"
+                android:layout_alignTop="@+id/point_marker_text"
+                android:src="@drawable/point_marker_circle"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="@dimen/legend_border_width"
+                android:layout_toRightOf="@id/point_marker_image_view"
+                android:layout_below="@id/buffer_outline_text"
+                android:id="@+id/point_marker_text"
+                android:text="Marker for Grocery Stores" />
+
+        </RelativeLayout>
+
+
+    </FrameLayout>
+
 </RelativeLayout>

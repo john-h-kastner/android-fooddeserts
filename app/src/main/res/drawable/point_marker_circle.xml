@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval" >
+    <!-- View background color -->
+    <solid
+        android:color="@color/point_marker_circle_color"/>
+    <size
+        android:height="10dp"
+        android:width="10dp"/>
+</shape>
