@@ -1,13 +1,14 @@
-# GEOG4774 Final Project: Food Desert Detection 
+# GEOG477 Final Project: Food Desert Detection
 
 ## Current Tasks 
 
+ * Implement/Improve the user interface
+ * Main page for app with information about food desert
  * Set initial view point to the users location (if gps is available)
- * Automaticaly query places API for many locations around user location
- * Implement user interface:
-   * Search box to jump to location
-   * Touch to ask if a location is in a food desert
-   * Anything else that looks good
+ * Implement Geocoding search box
+ * Dynamically choose buffer ranges based on query location and user preference (has car)
+ * Drivetime buffers option
+ * Loading Indicators for long running tasks
  * Add anything else we need to this list. 
  
 ## Resources
