@@ -1,16 +1,17 @@
 package geog477.fooddesert;
 
-import android.app.DialogFragment;
-import android.app.Fragment;
-import android.content.Context;
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Toast;
 
 import com.esri.arcgisruntime.geometry.Geometry;
 import com.esri.arcgisruntime.geometry.GeometryEngine;
@@ -25,6 +26,7 @@ import com.esri.arcgisruntime.mapping.Viewpoint;
 import com.esri.arcgisruntime.mapping.view.DefaultMapViewOnTouchListener;
 import com.esri.arcgisruntime.mapping.view.Graphic;
 import com.esri.arcgisruntime.mapping.view.GraphicsOverlay;
+import com.esri.arcgisruntime.mapping.view.LocationDisplay;
 import com.esri.arcgisruntime.mapping.view.MapView;
 import com.esri.arcgisruntime.symbology.FillSymbol;
 import com.esri.arcgisruntime.symbology.LineSymbol;
@@ -40,7 +42,6 @@ import com.google.maps.model.PlaceType;
 import com.google.maps.model.PlacesSearchResponse;
 import com.google.maps.model.PlacesSearchResult;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 
 public class ArcMapActivity extends AppCompatActivity {
@@ -61,26 +62,65 @@ public class ArcMapActivity extends AppCompatActivity {
     private static final String GROCERY_STORE_POINTS_FILE = "grocery_store_points";
     private static final String QUERY_CENTER_POINTS_FILE = "query_center_points";
 
-    private MapView mMapView;
-    private Button getStoresButton;
-
     private GeoApiContext context;
-
     private GraphicsOverlay groceryStoresBufferOverlay;
     private PointCollection groceryStores, queryCenters;
     private Polygon groceryStoresBuffer, queryBuffer;
+
+    private MapView mMapView;
+    private Button getStoresButton;
+    private LocationDisplay mLocationDisplay;
+    private int requestCode = 2;
+    String[] reqPermissions = new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_arc_map);
 
+        initMapTypeButton();
+        initLocationButton();
+
         /* Initial location is currently college park. This should probably attempt to detect user
-         * location from gps and use that instead.*/
+         * location from gps and use that instead.
+         *
+         * It now detects user location when you click Location button, original center is still around
+         * old coordinates but much more zoomed out so that it centers around the east coast originally.*/
         Point initialView = new Point(-76.927, 38.996,  SpatialReferences.getWebMercator());
         mMapView = findViewById(R.id.mapView);
-        ArcGISMap map = new ArcGISMap(Basemap.Type.TOPOGRAPHIC, initialView.getY(), initialView.getX(), 11);
+        final ArcGISMap map = new ArcGISMap(Basemap.Type.TOPOGRAPHIC, initialView.getY(), initialView.getX(), 5);
         mMapView.setMap(map);
+        mLocationDisplay = mMapView.getLocationDisplay();
+        mLocationDisplay.addDataSourceStatusChangedListener(new LocationDisplay.DataSourceStatusChangedListener() {
+            public void onStatusChanged(LocationDisplay.DataSourceStatusChangedEvent dataSourceStatusChangedEvent) {
+
+                // If LocationDisplay started OK, then continue.
+                if (dataSourceStatusChangedEvent.isStarted())
+                    return;
+
+                // No error is reported, then continue.
+                if (dataSourceStatusChangedEvent.getError() == null)
+                    return;
+
+                // If an error is found, handle the failure to start.
+                // Check permissions to see if failure may be due to lack of permissions.
+                boolean permissionCheck1 = ContextCompat.checkSelfPermission(ArcMapActivity.this, reqPermissions[0]) ==
+                        PackageManager.PERMISSION_GRANTED;
+                boolean permissionCheck2 = ContextCompat.checkSelfPermission(ArcMapActivity.this, reqPermissions[1]) ==
+                        PackageManager.PERMISSION_GRANTED;
+
+                if (!(permissionCheck1 && permissionCheck2)) {
+                    // If permissions are not already granted, request permission from the user.
+                    ActivityCompat.requestPermissions(ArcMapActivity.this, reqPermissions, requestCode);
+                } else {
+                    // Report other unknown failure types to the user - for example, location services may not
+                    // be enabled on the device.
+                    String message = String.format("Error in DataSourceStatusChangedListener: %s", dataSourceStatusChangedEvent
+                            .getSource().getLocationDataSource().getError().getMessage());
+                    Toast.makeText(ArcMapActivity.this, message, Toast.LENGTH_LONG).show();
+                }
+            }
+        });
 
         mMapView.setOnTouchListener(new DefaultMapViewOnTouchListener(this, mMapView) {
             @Override
@@ -121,6 +161,47 @@ public class ArcMapActivity extends AppCompatActivity {
         };
         new PointFileUtil.LoadPointsAsyncTask(this, groceryStores, updateGraphics).execute(GROCERY_STORE_POINTS_FILE);
         new PointFileUtil.LoadPointsAsyncTask(this, queryCenters, updateGraphics).execute(QUERY_CENTER_POINTS_FILE);
+    }
+
+    private void initMapTypeButton() {
+        final Button satelitebtn = (Button) findViewById(R.id.buttonMapType);
+        satelitebtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                String currentSetting = satelitebtn.getText().toString();
+                if (currentSetting.equalsIgnoreCase("Satellite View")) {
+                    Point initialView = new Point(-76.927, 38.996,  SpatialReferences.getWebMercator());
+                    mMapView = findViewById(R.id.mapView);
+                    satelitebtn.setText("Normal View");
+                    ArcGISMap map = new ArcGISMap(Basemap.Type.IMAGERY, initialView.getY(), initialView.getX(), 5);
+                    mMapView.setMap(map);
+                }
+                else {
+                    Point initialView = new Point(-76.927, 38.996,  SpatialReferences.getWebMercator());
+                    mMapView = findViewById(R.id.mapView);
+                    satelitebtn.setText("Satellite View");
+                    ArcGISMap map = new ArcGISMap(Basemap.Type.TOPOGRAPHIC, initialView.getY(), initialView.getX(), 5);
+                    mMapView.setMap(map);
+                }
+            }
+        });
+    }
+
+    private void initLocationButton() {
+        final Button locationbtn = (Button) findViewById(R.id.buttonShowMe);
+        locationbtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!mLocationDisplay.isStarted()){
+                    mLocationDisplay.startAsync();
+                    mLocationDisplay.setAutoPanMode(LocationDisplay.AutoPanMode.RECENTER);
+                    locationbtn.setText("Location Off");
+                }
+                else {
+                    mLocationDisplay.stop();
+                    locationbtn.setText("Location On");
+                }
+            }
+        });
     }
 
     @Override
