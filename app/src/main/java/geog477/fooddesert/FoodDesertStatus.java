@@ -1,7 +1,5 @@
 package geog477.fooddesert;
 
-import android.content.Context;
-
 /**
  * Created by john on 5/8/18.
  */

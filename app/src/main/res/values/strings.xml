@@ -5,4 +5,8 @@
     <string name="not_in_food_desert">Location is not in a food desert</string>
     <string name="loadStores">Load Grocery Stores</string>
     <string name="no_data">No data collected for location</string>
+    <string name="intro"> Welcome to Food Desert Visualization.</string>
+    <string name="gobuttonname">GO</string>
+    <string name="title_activity_welcome">Welcome</string>
+    <string name="body2">Click the button below, then tap the screen to check if it is in a food desert!</string>
 </resources>

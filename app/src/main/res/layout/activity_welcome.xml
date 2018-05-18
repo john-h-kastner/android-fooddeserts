@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    tools:context=".WelcomeActivity"
+>
+
+
+    <TextView
+        android:id="@+id/textIntro"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="10sp"
+
+        android:text="@string/intro"
+        android:textSize="20sp" />
+    <TextView
+        android:id="@+id/textBody"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="50sp"
+        android:textSize="18sp"
+        android:layout_centerHorizontal="true"
+        android:layout_below="@id/textIntro"
+        android:textAlignment="center"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/textBody2"
+        android:layout_below="@id/textBody"
+        android:layout_marginTop="5sp"
+        android:textSize="18sp"
+        android:layout_centerHorizontal="true"
+        android:text="@string/body2"
+        android:textAlignment="center"/>
+
+    <Button
+        android:layout_below="@id/textBody2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/gobuttonname"
+        android:id="@+id/go_to_map_btn"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="20sp"
+        />
+</RelativeLayout>
