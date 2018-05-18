@@ -2,7 +2,6 @@ package geog477.fooddesert;
 
 import android.content.Context;
 import android.os.AsyncTask;
-import android.util.Log;
 
 import com.esri.arcgisruntime.geometry.Point;
 import com.esri.arcgisruntime.geometry.PointCollection;
@@ -110,11 +109,7 @@ public class PointFileUtil {
         protected void onPostExecute(PointCollection storeLocations) {
             //Update data structures with new points
             //maybe move this loop off of the main thread?
-            for(Point p : storeLocations){
-                if(!finalPoints.contains(p)){
-                    finalPoints.add(p);
-                }
-            }
+            finalPoints.addAll(storeLocations);
 
             postExecTask.run();
         }

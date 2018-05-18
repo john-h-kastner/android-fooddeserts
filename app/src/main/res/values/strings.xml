@@ -9,4 +9,12 @@
     <string name="gobuttonname">GO</string>
     <string name="title_activity_welcome">Food Deserts</string>
     <string name="body2">Click the button below, then tap the screen to check if it is in a food desert!</string>
+    <string name="satellite_view">Satellite View</string>
+    <string name="normal_view">Normal View</string>
+    <string name="location_on">Location On</string>
+    <string name="location_off">Location Off</string>
+    <string name="area_not_in_food_desert">Area Not in Food Desert</string>
+    <string name="area_with_data_collected">Area with Data Collected</string>
+    <string name="marker_for_grocery_stores">Marker for Grocery Stores</string>
+    <string name="loading">loading.....</string>
 </resources>

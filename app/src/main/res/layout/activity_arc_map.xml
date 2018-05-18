@@ -20,14 +20,14 @@
             android:layout_height="wrap_content"
             android:layout_alignParentLeft="true"
             android:layout_marginLeft="20dp"
-            android:text="Location On" />
+            android:text="@string/location_on" />
         <Button
             android:id="@+id/buttonMapType"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentRight="true"
             android:layout_marginLeft="20dp"
-            android:text="Satellite View" />
+            android:text="@string/satellite_view" />
         <Button
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -65,7 +65,7 @@
                 android:layout_toRightOf="@id/buffer_fill_image_view"
                 android:layout_alignParentTop="true"
                 android:id="@id/buffer_fill_text"
-                android:text="Area Not in Food Desert" />
+                android:text="@string/area_not_in_food_desert" />
 
             <ImageView
                 android:layout_width="wrap_content"
@@ -85,7 +85,7 @@
                 android:layout_toRightOf="@id/buffer_outline_image_view"
                 android:layout_below="@id/buffer_fill_text"
                 android:id="@id/buffer_outline_text"
-                android:text="Area with Data Collected" />
+                android:text="@string/area_with_data_collected" />
 
             <ImageView
                 android:layout_width="wrap_content"
@@ -104,7 +104,7 @@
                 android:layout_toRightOf="@id/point_marker_image_view"
                 android:layout_below="@id/buffer_outline_text"
                 android:id="@+id/point_marker_text"
-                android:text="Marker for Grocery Stores" />
+                android:text="@string/marker_for_grocery_stores" />
 
         </RelativeLayout>
     </FrameLayout>
@@ -122,7 +122,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             style="@style/Base.TextAppearance.AppCompat.Large"
-            android:text="loading....."/>
+            android:text="@string/loading"/>
 
         <!--<ProgressBar
             android:layout_width="wrap_content"

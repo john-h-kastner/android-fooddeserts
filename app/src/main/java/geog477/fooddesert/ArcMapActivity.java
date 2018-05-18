@@ -2,10 +2,6 @@ package geog477.fooddesert;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.app.DialogFragment;
-import android.app.Fragment;
-import android.app.ProgressDialog;
-import android.content.Context;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -16,7 +12,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
-import android.widget.ProgressBar;
+
 import com.esri.arcgisruntime.geometry.Geometry;
 import com.esri.arcgisruntime.geometry.GeometryEngine;
 import com.esri.arcgisruntime.geometry.Multipoint;
@@ -177,19 +173,13 @@ public class ArcMapActivity extends AppCompatActivity {
         satelitebtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 String currentSetting = satelitebtn.getText().toString();
-                if (currentSetting.equalsIgnoreCase("Satellite View")) {
-                    Point initialView = new Point(-76.927, 38.996,  SpatialReferences.getWebMercator());
-                    mMapView = findViewById(R.id.mapView);
-                    satelitebtn.setText("Normal View");
-                    ArcGISMap map = new ArcGISMap(Basemap.Type.IMAGERY, initialView.getY(), initialView.getX(), 5);
-                    mMapView.setMap(map);
+                if (currentSetting.equals(getString(R.string.satellite_view))) {
+                    mMapView.getMap().setBasemap(Basemap.createImagery());
+                    satelitebtn.setText(R.string.normal_view);
                 }
                 else {
-                    Point initialView = new Point(-76.927, 38.996,  SpatialReferences.getWebMercator());
-                    mMapView = findViewById(R.id.mapView);
-                    satelitebtn.setText("Satellite View");
-                    ArcGISMap map = new ArcGISMap(Basemap.Type.TOPOGRAPHIC, initialView.getY(), initialView.getX(), 5);
-                    mMapView.setMap(map);
+                    mMapView.getMap().setBasemap(Basemap.createTopographic());
+                    satelitebtn.setText(R.string.satellite_view);
                 }
             }
         });
@@ -203,11 +193,11 @@ public class ArcMapActivity extends AppCompatActivity {
                 if (!mLocationDisplay.isStarted()){
                     mLocationDisplay.startAsync();
                     mLocationDisplay.setAutoPanMode(LocationDisplay.AutoPanMode.RECENTER);
-                    locationbtn.setText("Location Off");
+                    locationbtn.setText(R.string.location_off);
                 }
                 else {
                     mLocationDisplay.stop();
-                    locationbtn.setText("Location On");
+                    locationbtn.setText(R.string.location_on);
                 }
             }
         });
