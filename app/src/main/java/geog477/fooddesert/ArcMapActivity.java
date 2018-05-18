@@ -54,9 +54,9 @@ public class ArcMapActivity extends AppCompatActivity {
     private static final int PLACES_QUERY_RADIUS = 5 * (int) METERS_IN_MILE;
 
     /*Symbols used to draw data*/
-    private static final SimpleMarkerSymbol RED_CIRCLE_SYMBOL = new SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 10);
-    private static final FillSymbol BLUE_FILL_SYMBOL = new SimpleFillSymbol(SimpleFillSymbol.Style.CROSS, Color.BLUE, null);
-    private static final LineSymbol BLACK_LINE_SYMBOL = new SimpleLineSymbol(SimpleLineSymbol.Style.DASH, Color.BLACK, 3);
+    private SimpleMarkerSymbol grocery_store_symbol;
+    private FillSymbol grocery_store_buffer_symbol;
+    private LineSymbol data_available_buffer_symbol;
 
     /*Files where data from the Places API will be stored between runs*/
     private static final String GROCERY_STORE_POINTS_FILE = "grocery_store_points";
@@ -156,6 +156,15 @@ public class ArcMapActivity extends AppCompatActivity {
                 .Builder()
                 .apiKey(getString(R.string.google_maps_key))
                 .build();
+
+        int grocery_store_color = ContextCompat.getColor(getApplicationContext(), R.color.point_marker_circle_color);
+        grocery_store_symbol = new SimpleMarkerSymbol(SimpleMarkerSymbol.Style.CIRCLE, grocery_store_color, 10);
+
+        int grocery_store_buffer_color = ContextCompat.getColor(getApplicationContext(), R.color.food_desert_buffer_fill_color);
+        grocery_store_buffer_symbol = new SimpleFillSymbol(SimpleFillSymbol.Style.SOLID, grocery_store_buffer_color, null);
+
+        int data_available_buffer_color = ContextCompat.getColor(getApplicationContext(), R.color.data_area_buffer_border_color);
+        data_available_buffer_symbol = new SimpleLineSymbol(SimpleLineSymbol.Style.DASH, data_available_buffer_color, 3);
 
         /*load saved data async*/
         Runnable updateGraphics = new Runnable() {
@@ -298,14 +307,14 @@ public class ArcMapActivity extends AppCompatActivity {
         groceryStoresBufferOverlay.getGraphics().clear();
 
         //add new graphics
-        Graphic graphic0 = new Graphic(groceryMultipoint, RED_CIRCLE_SYMBOL);
-        groceryStoresBufferOverlay.getGraphics().add(graphic0);
-
-        Graphic graphic1 = new Graphic(groceryStoresBuffer, BLUE_FILL_SYMBOL);
+        Graphic graphic1 = new Graphic(groceryStoresBuffer, grocery_store_buffer_symbol);
         groceryStoresBufferOverlay.getGraphics().add(graphic1);
 
-        Graphic graphic2 = new Graphic(queryBuffer, BLACK_LINE_SYMBOL);
+        Graphic graphic2 = new Graphic(queryBuffer, data_available_buffer_symbol);
         groceryStoresBufferOverlay.getGraphics().add(graphic2);
+
+        Graphic graphic0 = new Graphic(groceryMultipoint, grocery_store_symbol);
+        groceryStoresBufferOverlay.getGraphics().add(graphic0);
     }
 
     private class PlacesAsyncTask extends AsyncTask<PlacesAsyncTask.Params, Integer, PointCollection> {
