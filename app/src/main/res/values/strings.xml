@@ -7,6 +7,6 @@
     <string name="no_data">No data collected for location</string>
     <string name="intro"> Welcome to Food Desert Visualization.</string>
     <string name="gobuttonname">GO</string>
-    <string name="title_activity_welcome">Welcome</string>
+    <string name="title_activity_welcome">Food Deserts</string>
     <string name="body2">Click the button below, then tap the screen to check if it is in a food desert!</string>
 </resources>
