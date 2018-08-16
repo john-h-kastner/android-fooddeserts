@@ -1,3 +1,5 @@
+> Note: This project is the precurser to another project of mine and is kept as record of work done in GEOG477. For a more developed version of this idea, please see [FoodDesertServer](https://github.com/jackastner/FoodDesertServer). 
+
 # GEOG477 Final Project: Food Desert Detection
 
 ## Current Tasks 
